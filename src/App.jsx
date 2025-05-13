@@ -18,6 +18,7 @@ import MultiStepForm from './components/Application/Application';
 import { AuthContext } from './AuthContext'
 import { getUser } from "./firebase";
 import { ProtectedAuthRoute, ProtectedRoute } from './ProtectedRoutes';
+import Success from './components/Application/Success';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -48,6 +49,7 @@ function App() {
             <Route path="/login" element={<ProtectedAuthRoute><SignIn /></ProtectedAuthRoute>} />
             <Route path="/register" element={<ProtectedAuthRoute><SignUp /></ProtectedAuthRoute>} />
             <Route path="/apply" element={<ProtectedRoute><MultiStepForm userData={userData} /></ProtectedRoute>} />
+            <Route path="/success" element={<Success />} />
             <Route path="*" element={<Error404 />} />
           </Routes>
           <Testimonial />
