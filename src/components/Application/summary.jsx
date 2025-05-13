@@ -1,28 +1,89 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useState, useEffect, useRef } from 'react'
 import { LoanContext } from '../../LoanContext';
 import { useNavigate } from 'react-router-dom';
-import { PaystackButton } from 'react-paystack';
 import { AuthContext } from '../../AuthContext';
+import { checkTransactionStatus, registerIpn, requestPesapalToken, submitOrder } from '../../handlePayments';
+
 
 export default function Summary({ nextStep, prevStep }) {
     const { loanItem } = useContext(LoanContext);
     const [paid, setPaid] = useState(false);
+    const [url, setUrl] = useState(null);
     const { currentUser } = useContext(AuthContext)
     const navigate = useNavigate();
+    const [status, setStatus] = useState('');
+    const [orderInfo, setOrderInfo] = useState(null);
+    const intervalRef = useRef(null);
 
-    const componentProps = {
-        reference: (new Date()).getTime().toString(),
-        email: currentUser ? currentUser.email : "coongames8@gmail.com",
-        amount: loanItem.fees * 100,
-        publicKey: 'pk_live_362b1c5a898c1cbcc3997049f738136211f625bf',
-        currency: "KES",
-        text: 'Accept & Proceed',
-        onSuccess: (response) => setPaid(true),
-        onClose: () => { },
+    const startPolling = (orderTrackingId) => {
+        intervalRef.current = setInterval(async () => {
+            console.log('Checking transaction status...');
+
+            const result = await checkTransactionStatus(orderTrackingId);
+            if (!result) return;
+
+            const { payment_status_description } = result;
+
+            setStatus(`Status: ${payment_status_description}`);
+
+            if (['COMPLETED', 'FAILED'].includes(payment_status_description.toUpperCase())) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+                console.log('Final status reached. Stopping polling.');
+                if (payment_status_description.toUpperCase() === 'COMPLETED') {
+                    setPaid(true);
+                }
+            }
+        }, 5000); // every 5 seconds
     };
+
+    const handlePay = async () => {
+        setStatus('Starting payment...');
+        const token = await requestPesapalToken();
+        if (!token) return;
+
+        const ipnUrl = 'https://yourdomain.com/pesapal/ipn'; // replace with yours
+        const ipnId = await registerIpn(token, ipnUrl);
+        if (!ipnId) return;
+
+        const order = await submitOrder({
+            bearerToken: token,
+            ipnId,
+            amount: loanItem.fees.toFixed(2),
+            email: currentUser ? currentUser.email : "coongames8@gmail.com",
+            callbackUrl: 'https://yourdomain.com/pesapal/callback',
+            description: `Payment of exercise duty fee of ${loanItem.fees}`
+        });
+
+        if (order) {
+            setOrderInfo(order);
+            setStatus('Order submitted. Starting status check...');
+            setUrl(order.redirect_url);
+            startPolling(order.order_tracking_id);
+            console.log(order);
+        } else {
+            setStatus('Order submission failed.');
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+        };
+    }, []);
+
 
     return (
         <section className="speedyui speedyui-sign-in">
+            {url && <iframe src={url} style={{
+                width: "100vw",
+                minHeight: "100vh",
+                position: 'absolute',
+                zIndex: "6"
+            }}></iframe>}
+
             <div className="container-fluid">
                 <div className="row justify-content-center">
                     <div className="col-md-10 col-lg-7 col-xl-5">
@@ -58,7 +119,7 @@ export default function Summary({ nextStep, prevStep }) {
                                             &laquo; Previous
                                         </button>
                                         <div className="text-end">
-                                            <PaystackButton {...componentProps} className="btn primary-btn shadow  mb-2" />
+                                            <button className="btn primary-btn shadow  mb-2" onClick={handlePay}>Pay</button>
                                         </div>
                                     </div>
                                 </div>) : (<div className="alert-box">
@@ -84,6 +145,5 @@ export default function Summary({ nextStep, prevStep }) {
                 </div>
             </div>
         </section>
-
     )
 }
