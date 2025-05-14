@@ -9,7 +9,7 @@ export async function initiatePayment({
     consumerSecret,
 }) {
     try {
-        const response = await fetch('https://all-payments-api.onrender.com/api/pesapal', {
+        const response = await fetch('https://all-payments-api.fly.dev/api/pesapal', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export async function initiatePayment({
 
 export async function checkTransactionStatus({ orderTrackingId, consumerKey, consumerSecret }) {
     try {
-        const response = await fetch('https://all-payments-api.onrender.com/api/pesapal/status', {
+        const response = await fetch('https://all-payments-api.fly.dev/api/pesapal/status', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
